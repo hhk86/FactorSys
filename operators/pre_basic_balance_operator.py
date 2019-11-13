@@ -12,8 +12,13 @@ class PreBasicBalanceOperator(Operator):
     @classmethod
     def load_data(cls, date, code_list=None):
 
-        ls = list(report_period_generator(period=30))
-        print(ls)
+        tuple_str = "("
+        for s in report_period_generator(period=20):
+            tuple_str += "'" + s + "',"
+        tuple_str += dt.datetime.strftime(dt.datetime.now(), "%Y%m%d")
+        tuple_str += ")"
+        print(tuple_str)
+
         print("Program Stoped!")
         time.sleep(100000)
         # whole_df = pd.DataFrame(columns=["trade_date", "code"])
