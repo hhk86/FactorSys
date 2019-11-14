@@ -39,14 +39,16 @@ class PreBasicBalanceOperator(Operator):
         df = pd.merge(df, get_listed_stocks(), on="s_info_windcode")
         df.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"], inplace=True)
         current_df = df.groupby(by="s_info_windcode").last()
-        print(current_df.shape[0])
-        snapshot_df = pd.DataFrame()
+        data_series = [(dt.datetime.strftime(dt.datetime.now(), "%Y%m%d"), list(current_df.index), current_df)]
         for snapshot_date in report_period_generator(period=20):
             print(snapshot_date)
             df_slice = df[(df["actual_ann_dt"] <= snapshot_date) & (df["report_period"] <= snapshot_date)].copy()
             df_slice.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"], inplace=True)
             df_slice = df_slice.groupby(by="s_info_windcode").last()
-            print(df_slice.shape[0])
+            data_series.append([snapshot_date, list(df_slice.index), df_slice])
+        data_df = pd.DataFrame(data_series, columns=["date", "ticker_list", "report"])
+        print(data_df)
+        snapshot_df = pd.DataFrame()
 
 
         print("Program Stoped!")
