@@ -922,7 +922,7 @@ def make_financial_factor(start_date, end_date, factor, test_mode=False):
 def get_listed_stocks():
     sql = '''
         SELECT
-            S_INFO_WINDCODE 
+            S_INFO_WINDCODE
         FROM
             wind.ASHAREDESCRIPTION 
         WHERE
@@ -930,7 +930,7 @@ def get_listed_stocks():
             AND substr( S_INFO_WINDCODE, 1, 1 ) != 'A'
         '''
     stock_list_df = __db.query_by_SQL("wind", sql)
-    print(stock_list_df)
+    return stock_list_df
 
 def report_period_generator(period):
     date = dt.datetime.now().date()
@@ -945,3 +945,5 @@ def report_period_generator(period):
             date = date.replace(year=date.year, month=9, day=30)
         period -= 1
         yield dt.datetime.strftime(date, "%Y%m%d")
+
+
