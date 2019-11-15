@@ -26,7 +26,25 @@ class PreBasicBalanceOperator(Operator):
                     STATEMENT_TYPE,
                     TOT_ASSETS AS total_assets,
                     TOT_SHRHLDR_EQY_EXCL_MIN_INT AS total_equities_exc_min,
-                    TOT_SHRHLDR_EQY_INCL_MIN_INT AS total_equities_inc_min 
+                    TOT_SHRHLDR_EQY_INCL_MIN_INT AS total_equities_inc_min,
+                    TOT_NON_CUR_LIAB AS noncur_liabilities,
+                    TOT_LIAB AS total_liabilities,
+                    LT_BORROW AS longterm_loan,
+                    BONDS_PAYABLE AS bonds_payable,
+                    LT_PAYABLE AS longterm_payable,
+                    OTHER_EQUITY_TOOLS_P_SHR AS preferred_stock,
+                    MONETARY_CAP AS cash,
+                    TRADABLE_FIN_ASSETS AS tradable_financialasset,
+                    NOTES_RCV AS notes_receiveable,
+                    ACCT_RCV AS accounts_receivable,
+                    INVENTORIES AS inventory,
+                    FIX_ASSETS AS fixed_asset,
+                    CONST_IN_PROG AS construction_inprogress,
+                    INTANG_ASSETS AS intangible_asset,
+                    R_AND_D_COSTS AS development_expenditure,
+                    GOODWILL AS goodwill,
+                    NOTES_PAYABLE AS notes_payable,
+                    ACCT_PAYABLE AS accounts_payable
                 FROM
                     wind.ASHAREBALANCESHEET
                 WHERE
@@ -72,11 +90,25 @@ class PreBasicBalanceOperator(Operator):
             for factor in data_df.loc[0, "report"].columns[3: -1]: # Exclude ["report_period", "actual_ann_dt", "statement_type", "max_level"]
                 for level in range(max_level, 0 , -1):
                     df.loc[ticker, factor + "_snapshots"][data_df.loc[level, "date"]] = data_df.loc[level, "report"].loc[ticker, factor]
-
-
+        for col in df.columns:
+            if col.endswith("_snapshots"):
+                df[col] = df[col].astype(str)
+        print("Convert some NaN to 0 ...")
+        for factor in ['total_assets', 'total_equities_exc_min', 'total_equities_inc_min',
+                    'noncur_liabilities', 'total_liabilities',
+                    'longterm_loan', 'bonds_payable', 'longterm_payable', 'preferred_stock',
+                    "cash", "tradable_financialasset", "notes_receiveable", "accounts_receivable",
+                    "inventory", "fixed_asset", "construction_inprogress", "intangible_asset",
+                    "development_expenditure", "goodwill", "notes_payable", "accounts_payable"]:
+            df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("{}", ''))
+            if factor not in ['total_assets', 'total_equities_exc_min', 'total_equities_inc_min',
+                              'noncur_liabilities', 'total_liabilities']:
+                df[factor] = df[factor].apply(lambda x: 0 if pd.isna(x) else x)
+                df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("nan", '0'))
 
         # print(j)
         print(df)
+
 
         df.to_csv("debug.csv")
 
