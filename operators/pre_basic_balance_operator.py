@@ -5,6 +5,7 @@ from common import db
 from operators.operator import Operator
 from utils.data_util import *
 import time
+import sys
 
 class PreBasicBalanceOperator(Operator):
     schema= 'basicdb'
@@ -17,7 +18,6 @@ class PreBasicBalanceOperator(Operator):
             tuple_str += "'" + s + "',"
         tuple_str = tuple_str[:-1]
         tuple_str += ")"
-        print(tuple_str)
         sql = '''
                 SELECT
                     S_INFO_WINDCODE,
@@ -39,17 +39,41 @@ class PreBasicBalanceOperator(Operator):
         df = pd.merge(df, get_listed_stocks(), on="s_info_windcode")
         df.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"], inplace=True)
         current_df = df.groupby(by="s_info_windcode").last()
+        # current_df.reset_index(level=0, inplace=True)
         data_series = [(dt.datetime.strftime(dt.datetime.now(), "%Y%m%d"), list(current_df.index), current_df)]
         for snapshot_date in report_period_generator(period=20):
             print(snapshot_date)
             df_slice = df[(df["actual_ann_dt"] <= snapshot_date) & (df["report_period"] <= snapshot_date)].copy()
             df_slice.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"], inplace=True)
             df_slice = df_slice.groupby(by="s_info_windcode").last()
+            # df_slice.reset_index(level=0, inplace=True)
             data_series.append([snapshot_date, list(df_slice.index), df_slice])
         data_df = pd.DataFrame(data_series, columns=["date", "ticker_list", "report"])
-        print(data_df)
-        snapshot_df = pd.DataFrame()
+        # df = pd.DataFrame(index=data_df.loc[0, "ticker_list"], columns=data_df.loc[0, "report"].columns[3:])
+        df = data_df.loc[0, "report"]
+        df.drop(["report_period", "actual_ann_dt", "statement_type"], axis=1, inplace=True)
+        for factor in df.columns:
+            df[factor + "_snapshots"] = [dict(), ] * df.shape[0]
+        print(df)
+        sys.exit()
 
+        j = 0
+        for ticker in data_df.loc[0, "ticker_list"]:
+            level = 0
+            while level < 20 and ticker in data_df.loc[level + 1, "ticker_list"]:
+                level += 1
+            while level > 0:
+                # print(data_df.loc[level, "report"].columns)
+                for factor in data_df.loc[level, "report"].columns[3:]:
+                    df.loc[ticker, factor + "_snapshots"][data_df.loc[level, "date"]] = data_df.loc[level, "report"].loc[ticker, factor]
+                    if level == 20 and factor == "total_assets":
+                        print(data_df.loc[level, "report"].loc[ticker, factor])
+                level -= 1
+            j += 1
+            print(j)
+        print(df)
+
+        df.to_csv("debug.csv")
 
         print("Program Stoped!")
         time.sleep(100000)
