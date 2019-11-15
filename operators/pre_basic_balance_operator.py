@@ -49,28 +49,33 @@ class PreBasicBalanceOperator(Operator):
             # df_slice.reset_index(level=0, inplace=True)
             data_series.append([snapshot_date, list(df_slice.index), df_slice])
         data_df = pd.DataFrame(data_series, columns=["date", "ticker_list", "report"])
-        # df = pd.DataFrame(index=data_df.loc[0, "ticker_list"], columns=data_df.loc[0, "report"].columns[3:])
-        df = data_df.loc[0, "report"]
-        df.drop(["report_period", "actual_ann_dt", "statement_type"], axis=1, inplace=True)
-        for factor in df.columns:
-            df[factor + "_snapshots"] = [dict(), ] * df.shape[0]
-        print(df)
-        sys.exit()
-
-        j = 0
         for ticker in data_df.loc[0, "ticker_list"]:
             level = 0
             while level < 20 and ticker in data_df.loc[level + 1, "ticker_list"]:
                 level += 1
-            while level > 0:
-                # print(data_df.loc[level, "report"].columns)
-                for factor in data_df.loc[level, "report"].columns[3:]:
+            data_df.loc[0, "report"].loc[ticker, "max_level"] = level
+        data_df.loc[0, "report"]["max_level"] = data_df.loc[0, "report"]["max_level"].astype(int)
+        df = data_df.loc[0, "report"].copy()
+        df.drop(["report_period", "actual_ann_dt", "statement_type", "max_level"], axis=1, inplace=True)
+        for factor in df.columns:
+            df[factor + "_snapshots"] = [dict(), ] * df.shape[0]
+        for col in df.columns:
+            if col.endswith("_snapshots"):
+                for index in df.index:
+                    df.set_value(index, col, dict())
+        print("Initialization finished!")
+
+
+        for ticker in data_df.loc[0, "ticker_list"]:
+            print(ticker)
+            max_level = data_df.loc[0, "report"].loc[ticker, "max_level"]
+            for factor in data_df.loc[0, "report"].columns[3: -1]: # Exclude ["report_period", "actual_ann_dt", "statement_type", "max_level"]
+                for level in range(max_level, 0 , -1):
                     df.loc[ticker, factor + "_snapshots"][data_df.loc[level, "date"]] = data_df.loc[level, "report"].loc[ticker, factor]
-                    if level == 20 and factor == "total_assets":
-                        print(data_df.loc[level, "report"].loc[ticker, factor])
-                level -= 1
-            j += 1
-            print(j)
+
+
+
+        # print(j)
         print(df)
 
         df.to_csv("debug.csv")
