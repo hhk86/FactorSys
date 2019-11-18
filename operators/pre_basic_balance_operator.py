@@ -13,6 +13,7 @@ class PreBasicBalanceOperator(Operator):
 
     @classmethod
     def load_data(cls, date, code_list=None):
+        print("Downloading data ...")
         tuple_str = "("
         for s in report_period_generator(period=32):
             tuple_str += "'" + s + "',"
@@ -53,18 +54,23 @@ class PreBasicBalanceOperator(Operator):
                     AND REPORT_PERIOD in {}
         	'''.format(tuple_str)
         df = db.query_by_SQL("wind", sql)
+        return df
+
+
+    @classmethod
+    def fit(cls, datas):
+        df = datas
+        print("Processing data ...")
         pd.set_option("display.max_columns", None)
         df = pd.merge(df, get_listed_stocks(), on="s_info_windcode")
         df.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"], inplace=True)
         current_df = df.groupby(by="s_info_windcode").last()
-        # current_df.reset_index(level=0, inplace=True)
         data_series = [(dt.datetime.strftime(dt.datetime.now(), "%Y%m%d"), list(current_df.index), current_df)]
         for snapshot_date in report_period_generator(period=20):
-            print(snapshot_date)
             df_slice = df[(df["actual_ann_dt"] <= snapshot_date) & (df["report_period"] <= snapshot_date)].copy()
-            df_slice.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"], inplace=True)
+            df_slice.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"],
+                                 inplace=True)
             df_slice = df_slice.groupby(by="s_info_windcode").last()
-            # df_slice.reset_index(level=0, inplace=True)
             data_series.append([snapshot_date, list(df_slice.index), df_slice])
         data_df = pd.DataFrame(data_series, columns=["date", "ticker_list", "report"])
         for ticker in data_df.loc[0, "ticker_list"]:
@@ -81,62 +87,35 @@ class PreBasicBalanceOperator(Operator):
             if col.endswith("_snapshots"):
                 for index in df.index:
                     df.set_value(index, col, dict())
-        print("Initialization finished!")
 
-
+        print("Making snapshots ...")
         for ticker in data_df.loc[0, "ticker_list"]:
-            print(ticker)
             max_level = data_df.loc[0, "report"].loc[ticker, "max_level"]
-            for factor in data_df.loc[0, "report"].columns[3: -1]: # Exclude ["report_period", "actual_ann_dt", "statement_type", "max_level"]
-                for level in range(max_level, 0 , -1):
-                    df.loc[ticker, factor + "_snapshots"][data_df.loc[level, "date"]] = data_df.loc[level, "report"].loc[ticker, factor]
+            for factor in data_df.loc[0, "report"].columns[
+                          3: -1]:  # Exclude ["report_period", "actual_ann_dt", "statement_type", "max_level"]
+                for level in range(max_level, 0, -1):
+                    df.loc[ticker, factor + "_snapshots"][data_df.loc[level, "date"]] = \
+                    data_df.loc[level, "report"].loc[ticker, factor]
         for col in df.columns:
             if col.endswith("_snapshots"):
                 df[col] = df[col].astype(str)
-        print("Convert some NaN to 0 ...")
+        print("Converting some NaN to 0 ...")
         for factor in ['total_assets', 'total_equities_exc_min', 'total_equities_inc_min',
-                    'noncur_liabilities', 'total_liabilities',
-                    'longterm_loan', 'bonds_payable', 'longterm_payable', 'preferred_stock',
-                    "cash", "tradable_financialasset", "notes_receiveable", "accounts_receivable",
-                    "inventory", "fixed_asset", "construction_inprogress", "intangible_asset",
-                    "development_expenditure", "goodwill", "notes_payable", "accounts_payable"]:
+                       'noncur_liabilities', 'total_liabilities',
+                       'longterm_loan', 'bonds_payable', 'longterm_payable', 'preferred_stock',
+                       "cash", "tradable_financialasset", "notes_receiveable", "accounts_receivable",
+                       "inventory", "fixed_asset", "construction_inprogress", "intangible_asset",
+                       "development_expenditure", "goodwill", "notes_payable", "accounts_payable"]:
             df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("{}", ''))
             if factor not in ['total_assets', 'total_equities_exc_min', 'total_equities_inc_min',
                               'noncur_liabilities', 'total_liabilities']:
                 df[factor] = df[factor].apply(lambda x: 0 if pd.isna(x) else x)
                 df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("nan", '0'))
 
-        # print(j)
-        print(df)
-
-
         df.to_csv("debug.csv")
 
-        print("Program Stoped!")
-        time.sleep(100000)
-        # whole_df = pd.DataFrame(columns=["trade_date", "code"])
-        # end_date = datetime.datetime.strftime(datetime.datetime.strptime(date, "%Y%m%d") + datetime.timedelta(10), "%Y%m%d")
-        # # print(date, end_date)
-        # # for factor in ['total_assets', 'total_equities_exc_min', 'total_equities_inc_min',
-        # #             'noncur_liabilities', 'total_liabilities',
-        # #             'longterm_loan', 'bonds_payable', 'longterm_payable', 'preferred_stock',
-        # #             "cash", "tradable_financialasset", "notes_receiveable", "accounts_receivable",
-        # #             "inventory", "fixed_asset", "construction_inprogress", "intangible_asset",
-        # #             "development_expenditure", "goodwill", "notes_payable", "accounts_payable"]:
-        # for factor in ['total_assets', 'total_equities_exc_min', 'total_equities_inc_min',
-        #             'noncur_liabilities']:
-        # # for factor in ["goodwill",]:
-        #     df=  make_financial_factor(date, end_date, factor, test_mode=True)
-        #     df.rename(columns={'tradeday': 'trade_date', 'ticker': 'code'}, inplace=True)
-        #     df = df[df["trade_date"] == date]
-        #     whole_df = pd.merge(whole_df, df, how="outer")
-        #     pd.set_option("display.max_columns", None)
-        # print(whole_df)
-        # return whole_df
 
-    @classmethod
-    def fit(cls, datas):
-        return datas
+        return df
 
     @classmethod
     def dump_data(cls, datas):
