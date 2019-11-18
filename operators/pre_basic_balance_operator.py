@@ -15,7 +15,7 @@ class PreBasicBalanceOperator(Operator):
     def load_data(cls, date, code_list=None):
         print("Downloading data ...")
         tuple_str = "("
-        for s in report_period_generator(period=32):
+        for s in report_period_generator(period=32, date=date):
             tuple_str += "'" + s + "',"
         tuple_str = tuple_str[:-1]
         tuple_str += ")"
@@ -51,22 +51,23 @@ class PreBasicBalanceOperator(Operator):
                 WHERE
                     SUBSTR(S_INFO_WINDCODE, 1, 1) != 'A'
                     AND STATEMENT_TYPE in (408001000, 408004000, 408005000, 408050000)
-                    AND REPORT_PERIOD in {}
-        	'''.format(tuple_str)
+                    AND REPORT_PERIOD in {0}
+                    AND ACTUAL_ANN_DT <= {1}
+        	'''.format(tuple_str, date)
         df = db.query_by_SQL("wind", sql)
-        return df
+        return df, date
 
 
     @classmethod
     def fit(cls, datas):
-        df = datas
+        df, date = datas
         print("Processing data ...")
         pd.set_option("display.max_columns", None)
         df = pd.merge(df, get_listed_stocks(), on="s_info_windcode")
         df.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"], inplace=True)
         current_df = df.groupby(by="s_info_windcode").last()
         data_series = [(dt.datetime.strftime(dt.datetime.now(), "%Y%m%d"), list(current_df.index), current_df)]
-        for snapshot_date in report_period_generator(period=20):
+        for snapshot_date in report_period_generator(period=20, date=date):
             df_slice = df[(df["actual_ann_dt"] <= snapshot_date) & (df["report_period"] <= snapshot_date)].copy()
             df_slice.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"],
                                  inplace=True)
@@ -112,16 +113,22 @@ class PreBasicBalanceOperator(Operator):
                 df[factor] = df[factor].apply(lambda x: 0 if pd.isna(x) else x)
                 df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("nan", '0'))
 
+        df = df.reset_index()
+        df.rename(columns={'s_info_windcode': 'code'}, inplace=True)
+        df["trade_date"] = date
+        new_cols = list(df.columns)
+        new_cols.insert(0, new_cols.pop(new_cols.index("trade_date"))) # Put trade_date into the first column
+        df = df[new_cols]
         df.to_csv("debug.csv")
 
 
         return df
 
-    @classmethod
-    def dump_data(cls, datas):
-        '''
-        数据存储默认方法，如有不同存储方式，子类可重写该方法。
-        :param datas: dataframe 待存储数据，必须有trade_date字段，且不为空
-        :return:
-        '''
-        print(datas)
+    # @classmethod
+    # def dump_data(cls, datas):
+    #     '''
+    #     数据存储默认方法，如有不同存储方式，子类可重写该方法。
+    #     :param datas: dataframe 待存储数据，必须有trade_date字段，且不为空
+    #     :return:
+    #     '''
+    #     print(datas)
