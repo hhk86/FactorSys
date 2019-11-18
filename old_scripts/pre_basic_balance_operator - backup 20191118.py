@@ -7,15 +7,15 @@ from utils.data_util import *
 import time
 import sys
 
-class PreBasicIncomeOperator(Operator):
+class PreBasicBalanceOperator(Operator):
     schema= 'basicdb'
-    table = 'basic_income'
+    table = 'basic_balance'
 
     @classmethod
     def load_data(cls, date, code_list=None):
         print("Downloading data ...")
         tuple_str = "("
-        for s in report_period_generator(period=32, date=date):
+        for s in report_period_generator(period=32):
             tuple_str += "'" + s + "',"
         tuple_str = tuple_str[:-1]
         tuple_str += ")"
@@ -25,39 +25,48 @@ class PreBasicIncomeOperator(Operator):
                     REPORT_PERIOD,
                     ACTUAL_ANN_DT,
                     STATEMENT_TYPE,
-                    NET_PROFIT_EXCL_MIN_INT_INC AS net_income,
-                    TOT_OPER_REV AS total_revenue,
-                    OPER_REV AS revenue,
-                    TOT_OPER_COST AS total_opcost,
-                    LESS_OPER_COST AS operating_cost,
-                    LESS_SELLING_DIST_EXP AS sale_expense,
-                    LESS_GERL_ADMIN_EXP AS management_expense,
-                    RD_EXPENSE AS research_expense,
-                    LESS_FIN_EXP AS financial_expense,
-                    OPER_PROFIT AS operating_profit
+                    TOT_ASSETS AS total_assets,
+                    TOT_SHRHLDR_EQY_EXCL_MIN_INT AS total_equities_exc_min,
+                    TOT_SHRHLDR_EQY_INCL_MIN_INT AS total_equities_inc_min,
+                    TOT_NON_CUR_LIAB AS noncur_liabilities,
+                    TOT_LIAB AS total_liabilities,
+                    LT_BORROW AS longterm_loan,
+                    BONDS_PAYABLE AS bonds_payable,
+                    LT_PAYABLE AS longterm_payable,
+                    OTHER_EQUITY_TOOLS_P_SHR AS preferred_stock,
+                    MONETARY_CAP AS cash,
+                    TRADABLE_FIN_ASSETS AS tradable_financialasset,
+                    NOTES_RCV AS notes_receiveable,
+                    ACCT_RCV AS accounts_receivable,
+                    INVENTORIES AS inventory,
+                    FIX_ASSETS AS fixed_asset,
+                    CONST_IN_PROG AS construction_inprogress,
+                    INTANG_ASSETS AS intangible_asset,
+                    R_AND_D_COSTS AS development_expenditure,
+                    GOODWILL AS goodwill,
+                    NOTES_PAYABLE AS notes_payable,
+                    ACCT_PAYABLE AS accounts_payable
                 FROM
-                    wind.ASHAREINCOME
+                    wind.ASHAREBALANCESHEET
                 WHERE
                     SUBSTR(S_INFO_WINDCODE, 1, 1) != 'A'
                     AND STATEMENT_TYPE in (408001000, 408004000, 408005000, 408050000)
-                    AND REPORT_PERIOD in {0}
-                    AND ACTUAL_ANN_DT <= {1}
-        	'''.format(tuple_str, date)
+                    AND REPORT_PERIOD in {}
+        	'''.format(tuple_str)
         df = db.query_by_SQL("wind", sql)
-        pd.set_option("display.max_columns", None)
-        return df, date
+        return df
 
 
     @classmethod
     def fit(cls, datas):
-        df, date = datas
+        df = datas
         print("Processing data ...")
         pd.set_option("display.max_columns", None)
         df = pd.merge(df, get_listed_stocks(), on="s_info_windcode")
         df.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"], inplace=True)
         current_df = df.groupby(by="s_info_windcode").last()
         data_series = [(dt.datetime.strftime(dt.datetime.now(), "%Y%m%d"), list(current_df.index), current_df)]
-        for snapshot_date in report_period_generator(period=20, date=date):
+        for snapshot_date in report_period_generator(period=20):
             df_slice = df[(df["actual_ann_dt"] <= snapshot_date) & (df["report_period"] <= snapshot_date)].copy()
             df_slice.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"],
                                  inplace=True)
@@ -91,19 +100,18 @@ class PreBasicIncomeOperator(Operator):
             if col.endswith("_snapshots"):
                 df[col] = df[col].astype(str)
         print("Converting some NaN to 0 ...")
-        for factor in ["net_income", "total_revenue", "revenue", "total_opcost", "operating_cost", "sale_expense",
-                "management_expense", "research_expense", "financial_expense", "operating_profit"]:
+        for factor in ['total_assets', 'total_equities_exc_min', 'total_equities_inc_min',
+                       'noncur_liabilities', 'total_liabilities',
+                       'longterm_loan', 'bonds_payable', 'longterm_payable', 'preferred_stock',
+                       "cash", "tradable_financialasset", "notes_receiveable", "accounts_receivable",
+                       "inventory", "fixed_asset", "construction_inprogress", "intangible_asset",
+                       "development_expenditure", "goodwill", "notes_payable", "accounts_payable"]:
             df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("{}", ''))
-            if factor not in ["net_income", "total_revenue"]:
+            if factor not in ['total_assets', 'total_equities_exc_min', 'total_equities_inc_min',
+                              'noncur_liabilities', 'total_liabilities']:
                 df[factor] = df[factor].apply(lambda x: 0 if pd.isna(x) else x)
                 df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("nan", '0'))
 
-        df = df.reset_index()
-        df.rename(columns={'s_info_windcode': 'code'}, inplace=True)
-        df["trade_date"] = date
-        new_cols = list(df.columns)
-        new_cols.insert(0, new_cols.pop(new_cols.index("trade_date"))) # Put trade_date into the first column
-        df = df[new_cols]
         df.to_csv("debug.csv")
 
 
