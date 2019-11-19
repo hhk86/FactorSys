@@ -75,7 +75,6 @@ class PreBasicIncomeOperator(Operator):
         for ticker in data_df.loc[0, "ticker_list"]:
             if data_df.loc[0, "report"].loc[ticker, "max_level"] >= 5:
                 shift = Quarters2LastDec(date)
-                print(data_df.loc[shift, "date"])
                 ttm_df.loc[ticker, :] = data_df.loc[0, "report"].ix[ticker, 3:] \
                                         + data_df.loc[shift, "report"].ix[ticker, 3:] - data_df.loc[5, "report"].ix[ticker, 3:]
         ttm_df = ttm_df.reset_index()
