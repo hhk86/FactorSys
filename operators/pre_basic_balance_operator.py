@@ -124,11 +124,11 @@ class PreBasicBalanceOperator(Operator):
 
         return df
 
-    # @classmethod
-    # def dump_data(cls, datas):
-    #     '''
-    #     数据存储默认方法，如有不同存储方式，子类可重写该方法。
-    #     :param datas: dataframe 待存储数据，必须有trade_date字段，且不为空
-    #     :return:
-    #     '''
-    #     print(datas)
+    @classmethod
+    def dump_data(cls, datas):
+        '''
+        数据存储默认方法，如有不同存储方式，子类可重写该方法。
+        :param datas: dataframe 待存储数据，必须有trade_date字段，且不为空
+        :return:
+        '''
+        print(datas)
