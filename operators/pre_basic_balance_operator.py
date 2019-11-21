@@ -1,11 +1,11 @@
-'''
-barra beta因子计算程序
-'''
+import pandas as pd
+import datetime as dt
 from common import db
 from operators.operator import Operator
-from utils.data_util import *
-import time
-import sys
+from utils.data_util import report_period_generator, get_listed_stocks
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 
 class PreBasicBalanceOperator(Operator):
     schema= 'basicdb'
@@ -62,7 +62,6 @@ class PreBasicBalanceOperator(Operator):
     def fit(cls, datas):
         df, date = datas
         print("Processing data ...")
-        pd.set_option("display.max_columns", None)
         df = pd.merge(df, get_listed_stocks(), on="s_info_windcode")
         df.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"], inplace=True)
         current_df = df.groupby(by="s_info_windcode").last()
@@ -100,6 +99,7 @@ class PreBasicBalanceOperator(Operator):
         for col in df.columns:
             if col.endswith("_snapshots"):
                 df[col] = df[col].astype(str)
+
         print("Converting some NaN to 0 ...")
         for factor in ['total_assets', 'total_equities_exc_min', 'total_equities_inc_min',
                        'noncur_liabilities', 'total_liabilities',
@@ -112,23 +112,21 @@ class PreBasicBalanceOperator(Operator):
                               'noncur_liabilities', 'total_liabilities']:
                 df[factor] = df[factor].apply(lambda x: 0 if pd.isna(x) else x)
                 df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("nan", '0'))
-
         df = df.reset_index()
         df.rename(columns={'s_info_windcode': 'code'}, inplace=True)
         df["trade_date"] = date
         new_cols = list(df.columns)
         new_cols.insert(0, new_cols.pop(new_cols.index("trade_date"))) # Put trade_date into the first column
         df = df[new_cols]
-        df.to_csv("debug.csv")
-
 
         return df
 
-    @classmethod
-    def dump_data(cls, datas):
-        '''
-        数据存储默认方法，如有不同存储方式，子类可重写该方法。
-        :param datas: dataframe 待存储数据，必须有trade_date字段，且不为空
-        :return:
-        '''
-        print(datas)
+
+    # @classmethod
+    # def dump_data(cls, datas):
+    #     '''
+    #     数据存储默认方法，如有不同存储方式，子类可重写该方法。
+    #     :param datas: dataframe 待存储数据，必须有trade_date字段，且不为空
+    #     :return:
+    #     '''
+    #     print(datas)
