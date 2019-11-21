@@ -932,8 +932,11 @@ def get_listed_stocks():
     stock_list_df = __db.query_by_SQL("wind", sql)
     return stock_list_df
 
-def report_period_generator(period):
-    date = dt.datetime.now().date()
+def report_period_generator(period, date=None):
+    if date is None:
+        date = dt.datetime.now().date()
+    else:
+        date = dt.datetime.strptime(date, "%Y%m%d").date()
     while period > 0:
         if date.month in (1, 2, 3):
             date = date.replace(year=date.year - 1, month=12, day=31)
@@ -945,5 +948,17 @@ def report_period_generator(period):
             date = date.replace(year=date.year, month=9, day=30)
         period -= 1
         yield dt.datetime.strftime(date, "%Y%m%d")
+
+def Quarters2LastDec(date):
+    date = dt.datetime.strptime(date, "%Y%m%d")
+    if date.month in (1, 2, 3):
+        return 1
+    elif date.month in (4, 5, 6):
+        return 2
+    elif date.month in (7, 8, 9):
+        return 3
+    else:
+        return 4
+
 
 

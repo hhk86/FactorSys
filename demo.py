@@ -11,11 +11,11 @@ if __name__ == '__main__':
     # operators.execute('barra_non_linear_size_operator.BarraNonLinearSizeOperator', date)
     # operators.execute('barra_residual_volatility_operator.BarraResidualVolatilityOperator', date)
 
-    from operators.pre_basic_balance_operator import PreBasicBalanceOperator
-    PreBasicBalanceOperator.execute('20191018')
+    # from operators.pre_basic_balance_operator import PreBasicBalanceOperator
+    # PreBasicBalanceOperator.execute('20161118')
 
     # from operators.pre_basic_income_operator import PreBasicIncomeOperator
-    # PreBasicIncomeOperator.execute('20191018')
+    # PreBasicIncomeOperator.execute('20181101')
     #
-    # from operators.pre_basic_cashflow_operator import PreBasicCashflowOperator
-    # PreBasicCashflowOperator.execute('20191018')
+    from operators.pre_basic_cashflow_operator import PreBasicCashflowOperator
+    PreBasicCashflowOperator.execute('20181101')
