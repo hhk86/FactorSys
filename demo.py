@@ -17,5 +17,5 @@ if __name__ == '__main__':
     # from operators.pre_basic_income_operator import PreBasicIncomeOperator
     # PreBasicIncomeOperator.execute('20191101')
 
-    # from operators.pre_basic_cashflow_operator import PreBasicCashflowOperator
-    # PreBasicCashflowOperator.execute('20191101')
+    from operators.pre_basic_cashflow_operator import PreBasicCashflowOperator
+    PreBasicCashflowOperator.execute('20191101')

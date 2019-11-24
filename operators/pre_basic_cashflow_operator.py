@@ -9,7 +9,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class PreBasicCashflowOperator(Operator):
     schema= 'basicdb'
-    table = 'basic_balance'
+    table = 'basic_cashflow'
 
     @classmethod
     def load_data(cls, date, code_list=None):
@@ -55,7 +55,6 @@ class PreBasicCashflowOperator(Operator):
         current_df = df.groupby(by="s_info_windcode").last()
         data_series = [(dt.datetime.strftime(dt.datetime.now(), "%Y%m%d"), list(current_df.index), current_df)]
         for snapshot_date in report_period_generator(period=24, date=date):
-            # df_slice = df[(df["actual_ann_dt"] <= snapshot_date) & (df["report_period"] <= snapshot_date)].copy()
             df_slice = df[df["report_period"] <= snapshot_date].copy()
             df_slice.sort_values(by=["s_info_windcode", "report_period", "actual_ann_dt", "statement_type"],
                                  inplace=True)
@@ -69,39 +68,35 @@ class PreBasicCashflowOperator(Operator):
             data_df.loc[0, "report"].loc[ticker, "max_level"] = level
         data_df.loc[0, "report"]["max_level"] = data_df.loc[0, "report"]["max_level"].astype(int)
 
-        print("Making snapshots ...")
-        ttm_df = pd.DataFrame(columns=list(data_df.loc[0, "report"].columns)[3: -1])
+        print("Calculating TTM ...")
+        shift = Quarters2LastDec(date)
         for ticker in data_df.loc[0, "ticker_list"]:
             if data_df.loc[0, "report"].loc[ticker, "max_level"] >= 5:
-                shift = Quarters2LastDec(date)
-                ttm_df.loc[ticker, :] = data_df.loc[0, "report"].ix[ticker, 3:] \
-                                        + data_df.loc[shift, "report"].ix[ticker, 3:] - data_df.loc[5, "report"].ix[ticker, 3:]
-        ttm_df = ttm_df.reset_index()
-        ttm_df.rename(columns={'index': 'code'}, inplace=True)
-        ttm_df["trade_date"] = date
-        ttm_df["trade_date"] = date
-        new_cols = list(ttm_df.columns)
-        new_cols.insert(0, new_cols.pop(new_cols.index("trade_date")))
-        ttm_df = ttm_df[new_cols]
+                for col in data_df.loc[0, "report"].columns[3: -1]:
+                    data_df.loc[0, "report"].loc[ticker, col] = data_df.loc[0, "report"].loc[ticker, col] \
+                                            + data_df.loc[shift, "report"].loc[ticker, col] - data_df.loc[5, "report"].loc[ticker, col]
 
-        for col in ttm_df.columns[2:]:
-            ttm_df[col +"_snapshots"] = None
-        for col in ttm_df.columns:
+        print("Making snapshots ...")
+        df = data_df.loc[0, "report"].copy()
+        df.drop(["report_period", "actual_ann_dt", "statement_type", "max_level"], axis=1, inplace=True)
+        for factor in df.columns:
+            df[factor + "_snapshots"] = [dict(), ] * df.shape[0]
+        for col in df.columns:
             if col.endswith("_snapshots"):
-                for index in ttm_df.index:
-                    ttm_df.set_value(index, col, dict())
-        ttm_df.index = ttm_df["code"]
-        for k in range(20, 0, -1):
-            snapshot_date = data_df.loc[k, "date"]
-            shift = Quarters2LastDec(snapshot_date)
-            for ticker in data_df.loc[0, "ticker_list"]:
-                if data_df.loc[0, "report"].loc[ticker, "max_level"] >= k + 4:
-                    for col in data_df.loc[k + shift, "report"].columns[3: ]:
-                        ttm_df.loc[ticker, col + "_snapshots"][snapshot_date] = data_df.loc[k, "report"].loc[ticker, col] \
-                                + data_df.loc[k + shift, "report"].loc[ticker, col] - data_df.loc[k + 4, "report"].loc[ticker, col]
+                for index in df.index:
+                    df.set_value(index, col, dict())
+        for ticker in data_df.loc[0, "ticker_list"]:
+            max_level = data_df.loc[0, "report"].loc[ticker, "max_level"]
+            for factor in data_df.loc[0, "report"].columns[
+                          3: -1]:  # Exclude ["report_period", "actual_ann_dt", "statement_type", "max_level"]
+                for level in range(max_level, 0, -1):
+                    df.loc[ticker, factor + "_snapshots"][data_df.loc[level, "date"]] = \
+                    data_df.loc[level, "report"].loc[ticker, factor]
+        for col in df.columns:
+            if col.endswith("_snapshots"):
+                df[col] = df[col].astype(str)
 
         print("Converting some NaN to 0 ...")
-        df = ttm_df
         for col in df.columns:
             if col.endswith("_snapshots"):
                 df[col] = df[col].astype(str)
@@ -111,13 +106,21 @@ class PreBasicCashflowOperator(Operator):
             df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("{}", ''))
             df[factor] = df[factor].apply(lambda x: 0 if pd.isna(x) else x)
             df[factor + "_snapshots"] = df[factor + "_snapshots"].apply(lambda s: s.replace("nan", '0'))
+
+        df = df.reset_index()
+        df.rename(columns={'s_info_windcode': 'code'}, inplace=True)
+        df["trade_date"] = date
+        new_cols = list(df.columns)
+        new_cols.insert(0, new_cols.pop(new_cols.index("trade_date"))) # Put trade_date into the first column
+        df = df[new_cols]
         return df
 
     # @classmethod
-    # def dump_data(cls, datas):
-    #     '''
-    #     数据存储默认方法，如有不同存储方式，子类可重写该方法。
-    #     :param datas: dataframe 待存储数据，必须有trade_date字段，且不为空
-    #     :return:
-    #     '''
-    #     print(datas)
+    #     # def dump_data(cls, datas):
+    #     #     '''
+    #     #     数据存储默认方法，如有不同存储方式，子类可重写该方法。
+    #     #     :param datas: dataframe 待存储数据，必须有trade_date字段，且不为空
+    #     #     :return:
+    #     #     '''
+    #     #     pd.set_option("display.max_columns", None)
+    #     #     print(datas)
