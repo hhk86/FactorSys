@@ -13,9 +13,13 @@ if __name__ == '__main__':
 
     # from operators.pre_basic_balance_operator import PreBasicBalanceOperator
     # PreBasicBalanceOperator.execute('20191101')
-
+    #
     # from operators.pre_basic_income_operator import PreBasicIncomeOperator
     # PreBasicIncomeOperator.execute('20191101')
+    #
+    # from operators.pre_basic_cashflow_operator import PreBasicCashflowOperator
+    # PreBasicCashflowOperator.execute('20191101')
 
-    from operators.pre_basic_cashflow_operator import PreBasicCashflowOperator
-    PreBasicCashflowOperator.execute('20191101')
+
+    from models.barra_test_model import BarraCNE5Test
+    BarraCNE5Test.execute("20191101")

@@ -44,7 +44,8 @@ class BarraResidualVolatilityOperator(Operator):
             if df_tmp['dastd_weight'].sum() >= 0.8:
                 #计算dastd
                 re = df_tmp['stock']-df_tmp['rf']
-                dastd = np.sqrt(np.sum(np.power(re-re.mean(), 2) * df_tmp['dastd_weight'])/df_tmp['dastd_weight'].sum())
+                # dastd = np.sqrt(np.sum(np.power(re-re.mean(), 2) * df_tmp['dastd_weight'])/df_tmp['dastd_weight'].sum())
+                dastd = np.sqrt(np.cov(re, rowvar=False, aweights=df_tmp['dastd_weight']))
             if df_tmp.shape[0] >= (252*0.5):
                 #计算cmra
                 months = pd.DataFrame([np.sum(np.log(1+x)).rename(max(x.index)) for x in map(lambda x: df_tmp.iloc[x-21 if x >= 21 else 0:x][['stock', 'rf']], range(df_tmp.shape[0], 0, -21))])
